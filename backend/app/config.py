@@ -31,8 +31,15 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 24 hours
 
-    # CORS (frontend Vite default + common local ports)
-    cors_origins: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    # CORS — comma-separated exact origins (no trailing slash)
+    # Must include your Vercel URL in production, e.g.
+    # CORS_ORIGINS=http://localhost:5173,https://jobhunter-seven-mu.vercel.app
+    cors_origins: str = (
+        "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,"
+        "https://jobhunter-seven-mu.vercel.app"
+    )
+    # Also allow any *.vercel.app preview deploy (regex)
+    cors_origin_regex: str = r"https://.*\.vercel\.app"
 
     # Redis / Celery
     redis_url: str = "redis://localhost:6379/0"
@@ -90,7 +97,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> List[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
 
     @property
     def sqlalchemy_database_url(self) -> str:
