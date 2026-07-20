@@ -1,0 +1,87 @@
+# Jobhunter - root .gitignore
+
+# --------
+# OS / editor
+# --------
+.DS_Store
+*.swp
+*.swo
+*~
+
+.vscode/
+.idea/
+
+# --------
+# Backend (Python)
+# --------
+**/__pycache__/
+**/*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Type checker caches
+.mypy_cache/
+.pytest_cache/
+
+# pytest / coverage
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.coverage.*
+
+# Linting/formatting caches
+.ruff_cache/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads / generated files
+backend/uploads/
+uploads/
+
+# Secrets / environment variables
+**/.env
+**/.env.*
+
+# Alembic migrations state
+backend/alembic/versions/*.py
+
+# --------
+# Frontend (Vite/React)
+# --------
+frontend/node_modules/
+node_modules/
+
+frontend/dist/
+dist/
+
+frontend/.vite/
+.vite/
+
+# Build artifacts
+frontend/build/
+build/
+
+# --------
+# Docker / runtime
+# --------
+**/.DS_Store
+
+# Logs
+*.log
+
+# --------
+# Misc
+# --------
+*.pid
+*.seed
+*.lock
+
