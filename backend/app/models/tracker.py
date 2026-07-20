@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -10,6 +10,7 @@ from app.database import Base
 # Allowed pipeline statuses
 APPLICATION_STATUSES = (
     "wishlist",
+    "draft",
     "applied",
     "phone_screen",
     "interview",
@@ -35,6 +36,16 @@ class Application(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Phase B: email-apply package
+    apply_channel: Mapped[str | None] = mapped_column(String(32), nullable=True)  # email | url | manual
+    email_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    email_subject: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    email_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    match_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    send_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_auto: Mapped[bool] = mapped_column(default=False)
 
     user = relationship("User", back_populates="applications")
     job = relationship("Job", back_populates="applications")

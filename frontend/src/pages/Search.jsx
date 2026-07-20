@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import JobCard from "../components/JobCard";
 import EmptyState from "../components/EmptyState";
@@ -10,11 +11,16 @@ const emptyFilters = {
   source: "",
   is_remote: "",
   company: "",
+  apply_method: "",
 };
 
 export default function Search() {
   const { isAuthenticated } = useAuth();
-  const [filters, setFilters] = useState(emptyFilters);
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState(() => ({
+    ...emptyFilters,
+    apply_method: searchParams.get("apply_method") || "",
+  }));
   const [jobs, setJobs] = useState([]);
   const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +37,7 @@ export default function Search() {
         location: f.location || undefined,
         source: f.source || undefined,
         company: f.company || undefined,
+        apply_method: f.apply_method || undefined,
         limit: 50,
       };
       if (f.is_remote === "true") params.is_remote = true;
@@ -46,7 +53,12 @@ export default function Search() {
 
   useEffect(() => {
     api.listSources().then(setSources).catch(() => setSources([]));
-    loadJobs(emptyFilters);
+    const initial = {
+      ...emptyFilters,
+      apply_method: searchParams.get("apply_method") || "",
+    };
+    setFilters(initial);
+    loadJobs(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -74,8 +86,16 @@ export default function Search() {
         limit_per_source: 30,
       });
       setScrapeMsg(
-        `Fetched ${result.total_fetched} · new ${result.total_new} · updated ${result.total_updated}`
+        `Fetched ${result.total_fetched} · new ${result.total_new} · email-apply found ${result.email_apply_count ?? 0}`
       );
+      if (isAuthenticated) {
+        try {
+          const bf = await api.backfillApply();
+          setScrapeMsg((m) => `${m} · backfilled ${bf.updated} listings`);
+        } catch {
+          /* optional */
+        }
+      }
       await loadJobs(filters);
     } catch (err) {
       setScrapeMsg(err.message || "Scrape failed");
@@ -90,7 +110,7 @@ export default function Search() {
         <div>
           <h1>Search jobs</h1>
           <p className="muted">
-            Aggregate listings from RemoteOK, Remotive, ArbeitNow, and Adzuna.
+            Filter by <strong>Email apply</strong> to find roles you can apply to with your CV by mail.
           </p>
         </div>
         <button
@@ -152,6 +172,15 @@ export default function Search() {
             <option value="false">On-site / hybrid</option>
           </select>
         </label>
+        <label className="field">
+          <span>Apply method</span>
+          <select name="apply_method" value={filters.apply_method} onChange={onChange}>
+            <option value="">Any</option>
+            <option value="email">Email apply</option>
+            <option value="url">External URL</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </label>
         <div className="field field-action">
           <span>&nbsp;</span>
           <button type="submit" className="btn btn-primary">
@@ -170,9 +199,11 @@ export default function Search() {
         <EmptyState
           title="No jobs found"
           hint={
-            isAuthenticated
-              ? "Try different filters, or scrape fresh listings."
-              : "Sign in and scrape to pull jobs into the database."
+            filters.apply_method === "email"
+              ? "Few boards expose emails. Scrape more sources or clear the email filter."
+              : isAuthenticated
+                ? "Try different filters, or scrape fresh listings."
+                : "Sign in and scrape to pull jobs into the database."
           }
           action={
             <button type="button" className="btn btn-primary" onClick={scrape}>
@@ -184,6 +215,7 @@ export default function Search() {
         <>
           <p className="results-count">
             Showing <strong>{jobs.length}</strong> job{jobs.length === 1 ? "" : "s"}
+            {filters.apply_method === "email" && " (email apply)"}
           </p>
           <div className="job-list">
             {jobs.map((job) => (

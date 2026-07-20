@@ -135,18 +135,16 @@ def match_jobs_for_cv(
     limit: int = 25,
     min_score: float = 5.0,
     prefer_remote: bool | None = None,
+    email_apply_only: bool = False,
 ) -> tuple[list[MatchResult], list[str], list[str]]:
     skills, titles, keywords = ensure_cv_parsed(cv)
     if not skills and not titles and not keywords and not (cv.skills or "").strip():
         return [], skills, titles
 
-    # Cap scan for performance on large DBs
-    jobs = (
-        db.query(Job)
-        .order_by(Job.scraped_at.desc())
-        .limit(500)
-        .all()
-    )
+    q = db.query(Job).order_by(Job.scraped_at.desc())
+    if email_apply_only:
+        q = q.filter(Job.apply_method == "email", Job.apply_email.isnot(None))
+    jobs = q.limit(500).all()
 
     results: list[MatchResult] = []
     for job in jobs:

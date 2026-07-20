@@ -21,6 +21,9 @@ def list_jobs(
     source: str | None = None,
     is_remote: bool | None = None,
     company: str | None = None,
+    apply_method: str | None = Query(
+        None, description="email | url | unknown"
+    ),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -33,6 +36,7 @@ def list_jobs(
         source=source,
         is_remote=is_remote,
         company=company,
+        apply_method=apply_method,
     )
     return (
         query.order_by(Job.scraped_at.desc(), Job.posted_at.desc())
@@ -45,6 +49,17 @@ def list_jobs(
 @router.get("/sources", response_model=list[str])
 def list_sources() -> list[str]:
     return available_sources()
+
+
+@router.post("/backfill-apply")
+def backfill_apply_info(
+    limit: int = Query(500, ge=1, le=2000),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> dict:
+    """Re-scan existing jobs for apply emails/URLs."""
+    n = JobAggregator().backfill_apply_info(db, limit=limit)
+    return {"updated": n}
 
 
 @router.get("/{job_id}", response_model=JobOut)
@@ -61,7 +76,6 @@ def scrape_jobs(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> ScrapeResult:
-    """Trigger a scrape from external sources and store results (auth required)."""
     body = payload or ScrapeRequest()
     aggregator = JobAggregator()
     result = aggregator.scrape_and_store(

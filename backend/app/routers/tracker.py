@@ -98,6 +98,10 @@ def update_application(
         app.status = data["status"]
     if "notes" in data:
         app.notes = data["notes"]
+    if "email_subject" in data and data["email_subject"] is not None:
+        app.email_subject = data["email_subject"]
+    if "email_body" in data and data["email_body"] is not None:
+        app.email_body = data["email_body"]
     app.updated_at = datetime.utcnow()
     db.add(app)
     db.commit()

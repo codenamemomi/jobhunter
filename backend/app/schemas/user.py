@@ -24,6 +24,12 @@ class UserOut(BaseModel):
     full_name: str | None = None
     is_active: bool
     created_at: datetime
+    auto_draft_enabled: bool = False
+    auto_send_enabled: bool = False
+    auto_min_score: float = 75.0
+    auto_daily_limit: int = 5
+    auto_prefer_remote: bool = True
+    auto_email_only: bool = True
 
 
 class Token(BaseModel):

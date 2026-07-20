@@ -14,6 +14,7 @@ def apply_job_filters(
     is_remote: bool | None = None,
     company: str | None = None,
     tags: str | None = None,
+    apply_method: str | None = None,
 ) -> Query:
     """Apply common search filters to a Job query."""
     if q:
@@ -35,11 +36,12 @@ def apply_job_filters(
     if tags:
         for tag in [t.strip() for t in tags.split(",") if t.strip()]:
             query = query.filter(Job.tags.ilike(f"%{tag}%"))
+    if apply_method:
+        query = query.filter(Job.apply_method == apply_method.lower())
     return query
 
 
 def job_matches_keywords(job: Job, keywords: str | None) -> bool:
-    """Return True if job title/description/tags contain all comma-separated keywords."""
     if not keywords:
         return True
     haystack = " ".join(

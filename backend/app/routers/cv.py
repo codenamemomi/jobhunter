@@ -63,6 +63,7 @@ def cv_job_matches(
     limit: int = 25,
     min_score: float = 5.0,
     prefer_remote: bool | None = None,
+    email_apply_only: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> MatchResponse:
@@ -74,6 +75,7 @@ def cv_job_matches(
         limit=min(max(limit, 1), 100),
         min_score=min_score,
         prefer_remote=prefer_remote,
+        email_apply_only=email_apply_only,
     )
     if not skills and not titles and not (cv.skills or cv.raw_text):
         raise HTTPException(

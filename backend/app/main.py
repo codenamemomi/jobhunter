@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import alerts, auth, cv, jobs, searches, tracker
+from app.routers import alerts, apply, auth, cv, jobs, searches, tracker
 
 
 @asynccontextmanager
@@ -37,6 +37,7 @@ app.include_router(searches.router, prefix=prefix)
 app.include_router(tracker.router, prefix=prefix)
 app.include_router(cv.router, prefix=prefix)
 app.include_router(alerts.router, prefix=prefix)
+app.include_router(apply.router, prefix=prefix)
 
 
 @app.get("/")

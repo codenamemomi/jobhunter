@@ -81,6 +81,8 @@ export const api = {
   listSources: () => request("/api/jobs/sources"),
   scrapeJobs: (payload) =>
     request("/api/jobs/scrape", { method: "POST", body: payload, auth: true }),
+  backfillApply: (limit = 500) =>
+    request(`/api/jobs/backfill-apply?limit=${limit}`, { method: "POST", auth: true }),
 
   // Saved searches
   listSearches: () => request("/api/searches", { auth: true }),
@@ -152,6 +154,33 @@ export const api = {
   runAlerts: () => request("/api/alerts/run", { method: "POST", auth: true }),
   previewMatches: (searchId) =>
     request(`/api/alerts/preview/${searchId}`, { auth: true }),
+
+  // Apply queue (email applications)
+  listApplyQueue: (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "") qs.set(k, String(v));
+    });
+    const q = qs.toString();
+    return request(`/api/apply/queue${q ? `?${q}` : ""}`, { auth: true });
+  },
+  createDraft: (payload) =>
+    request("/api/apply/draft", { method: "POST", body: payload, auth: true }),
+  updateDraft: (id, payload) =>
+    request(`/api/apply/draft/${id}`, { method: "PATCH", body: payload, auth: true }),
+  sendDraft: (id, payload = { attach_cv: true }) =>
+    request(`/api/apply/send/${id}`, { method: "POST", body: payload, auth: true }),
+  getApplySettings: () => request("/api/apply/settings", { auth: true }),
+  updateApplySettings: (payload) =>
+    request("/api/apply/settings", { method: "PUT", body: payload, auth: true }),
+  runAutoApply: () => request("/api/apply/auto-run", { method: "POST", auth: true }),
+  emailStatus: () => request("/api/apply/email-status", { auth: true }),
+  testEmail: (to_email) =>
+    request("/api/apply/test-email", {
+      method: "POST",
+      body: to_email ? { to_email } : {},
+      auth: true,
+    }),
 };
 
 export { API_BASE, getToken };

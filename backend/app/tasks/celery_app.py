@@ -9,7 +9,11 @@ celery_app = Celery(
     "jobhunter",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.tasks.scrape_task", "app.tasks.alert_task"],
+    include=[
+        "app.tasks.scrape_task",
+        "app.tasks.alert_task",
+        "app.tasks.auto_apply_task",
+    ],
 )
 
 celery_app.conf.update(
@@ -19,15 +23,22 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     beat_schedule={
-        # Scrape free sources every 6 hours
         "scrape-jobs-every-6h": {
             "task": "app.tasks.scrape_task.scrape_all_jobs",
             "schedule": crontab(minute=0, hour="*/6"),
         },
-        # Run alert evaluation hourly
         "send-alerts-hourly": {
             "task": "app.tasks.alert_task.process_alerts",
             "schedule": crontab(minute=15),
+        },
+        # Phase D: auto draft/send email applications twice daily
+        "auto-apply-morning": {
+            "task": "app.tasks.auto_apply_task.process_auto_apply",
+            "schedule": crontab(minute=30, hour=8),
+        },
+        "auto-apply-evening": {
+            "task": "app.tasks.auto_apply_task.process_auto_apply",
+            "schedule": crontab(minute=30, hour=18),
         },
     },
 )

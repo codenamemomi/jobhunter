@@ -39,8 +39,8 @@ def update_cv(db: Session, user: User, payload: CVUpdate) -> CV:
     data = payload.model_dump(exclude_unset=True)
     for key, value in data.items():
         setattr(cv, key, value)
-    # Re-parse when structured profile changes (no file required)
-    _apply_parse(cv, cv_profile_text(cv))
+    # Re-parse for matching signals; do not wipe user-edited fields
+    _apply_parse(cv, cv_profile_text(cv), fill_empty_profile_fields=False)
     db.add(cv)
     db.commit()
     db.refresh(cv)
@@ -80,7 +80,6 @@ def upload_and_parse_cv(
     dest.write_bytes(content)
 
     cv = get_or_create_cv(db, user)
-    # remove previous file if present
     if cv.file_path and os.path.isfile(cv.file_path) and cv.file_path != str(dest):
         try:
             os.remove(cv.file_path)
@@ -90,7 +89,8 @@ def upload_and_parse_cv(
     cv.original_filename = filename
     cv.file_path = str(dest)
     cv.raw_text = text
-    _apply_parse(cv, text, prefer_extracted_contact=True)
+    # On upload, fill empty profile fields from parse (titles, experience, etc.)
+    _apply_parse(cv, text, prefer_extracted_contact=True, fill_empty_profile_fields=True)
 
     db.add(cv)
     db.commit()
@@ -100,23 +100,28 @@ def upload_and_parse_cv(
 
 def reparse_cv(db: Session, user: User) -> CV:
     cv = get_or_create_cv(db, user)
-    text = cv_profile_text(cv)
+    # Prefer raw uploaded text for accuracy
+    text = (cv.raw_text or "").strip() or cv_profile_text(cv)
     if not text.strip():
         raise HTTPException(
             status_code=400,
             detail="No CV content to parse. Upload a file or fill in your profile.",
         )
-    _apply_parse(cv, text)
+    _apply_parse(cv, text, prefer_extracted_contact=True, fill_empty_profile_fields=True)
     db.add(cv)
     db.commit()
     db.refresh(cv)
     return cv
 
 
-def _apply_parse(cv: CV, text: str, prefer_extracted_contact: bool = False) -> None:
+def _apply_parse(
+    cv: CV,
+    text: str,
+    prefer_extracted_contact: bool = False,
+    fill_empty_profile_fields: bool = False,
+) -> None:
     parsed = parse_cv_text(text)
 
-    # Merge skills field from form into parsed list
     form_skills = [s.strip() for s in (cv.skills or "").split(",") if s.strip()]
     all_skills = list(dict.fromkeys(parsed.skills + form_skills))
 
@@ -125,12 +130,22 @@ def _apply_parse(cv: CV, text: str, prefer_extracted_contact: bool = False) -> N
     cv.parsed_keywords = ",".join(parsed.keywords) if parsed.keywords else None
     cv.parsed_at = datetime.utcnow()
 
-    if prefer_extracted_contact:
+    if prefer_extracted_contact or fill_empty_profile_fields:
         if parsed.email and not cv.email:
             cv.email = parsed.email
         if parsed.phone and not cv.phone:
             cv.phone = parsed.phone
+
+    if fill_empty_profile_fields:
+        if parsed.full_name and not cv.full_name:
+            cv.full_name = parsed.full_name
         if parsed.suggested_headline and not cv.headline:
             cv.headline = parsed.suggested_headline
         if all_skills and not cv.skills:
             cv.skills = ", ".join(all_skills)
+        if parsed.experience_text and not cv.experience:
+            cv.experience = parsed.experience_text
+        if parsed.education_text and not cv.education:
+            cv.education = parsed.education_text
+        if parsed.summary_text and not cv.summary:
+            cv.summary = parsed.summary_text

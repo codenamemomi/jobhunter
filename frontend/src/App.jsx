@@ -7,6 +7,7 @@ import Saved from "./pages/Saved";
 import Tracker from "./pages/Tracker";
 import CV from "./pages/CV";
 import Matches from "./pages/Matches";
+import Queue from "./pages/Queue";
 import { useAuth } from "./store/AuthContext";
 
 export default function App() {
@@ -55,6 +56,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Matches />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="queue"
+          element={
+            <ProtectedRoute>
+              <Queue />
             </ProtectedRoute>
           }
         />

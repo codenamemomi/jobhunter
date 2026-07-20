@@ -31,4 +31,9 @@ class Job(Base):
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
+    # Phase A: how to apply
+    apply_method: Mapped[str] = mapped_column(String(32), default="unknown", index=True)
+    apply_email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    apply_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+
     applications = relationship("Application", back_populates="job")

@@ -4,6 +4,7 @@ import EmptyState from "../components/EmptyState";
 
 const STATUS_LABELS = {
   wishlist: "Wishlist",
+  draft: "Draft (email)",
   applied: "Applied",
   phone_screen: "Phone screen",
   interview: "Interview",

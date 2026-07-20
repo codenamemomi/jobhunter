@@ -1,8 +1,9 @@
 """Application settings from environment variables."""
 
 from functools import lru_cache
-from typing import List
+from typing import List, Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,13 +42,34 @@ class Settings(BaseSettings):
     adzuna_app_key: str = ""
     adzuna_country: str = "gb"
 
-    # Email (Brevo / Sendinblue) — optional; alerts log when unset
-    brevo_api_key: str = ""
+    # Email provider: auto | smtp | brevo | dry_run
+    # auto = SMTP if smtp_password set, else Brevo if key set, else dry_run
+    email_provider: str = "auto"
+
+    # Shared from/reply identity
     email_from: str = "alerts@jobhunter.local"
     email_from_name: str = "JobHunter"
 
+    # Brevo (Sendinblue) — EMAIL_FROM must be a verified sender in Brevo
+    brevo_api_key: str = ""
+
+    # SMTP / Gmail App Password
+    # For Gmail: enable 2FA → create App Password → use below
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""  # usually same as EMAIL_FROM for Gmail
+    smtp_password: str = ""  # Gmail app password (16 chars, spaces ok)
+    smtp_use_tls: bool = True
+
     # Uploaded CVs
     upload_dir: str = "./uploads"
+
+    @field_validator("brevo_api_key", "smtp_password", "smtp_user", "email_from", mode="before")
+    @classmethod
+    def _strip_secrets(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip().strip('"').strip("'")
+        return value
 
     @property
     def cors_origins_list(self) -> List[str]:
@@ -57,10 +79,46 @@ class Settings(BaseSettings):
     def is_sqlite(self) -> bool:
         return self.database_url.startswith("sqlite")
 
+    @property
+    def resolved_email_provider(self) -> Literal["smtp", "brevo", "dry_run"]:
+        mode = (self.email_provider or "auto").strip().lower()
+        smtp_ready = bool(self.smtp_password and (self.smtp_user or self.email_from))
+        brevo_ready = bool(self.brevo_api_key)
+
+        if mode == "dry_run":
+            return "dry_run"
+        if mode == "smtp":
+            if smtp_ready:
+                return "smtp"
+            # Incomplete Gmail config — fall back so apps still deliver
+            if brevo_ready:
+                return "brevo"
+            return "dry_run"
+        if mode == "brevo":
+            if brevo_ready:
+                return "brevo"
+            if smtp_ready:
+                return "smtp"
+            return "dry_run"
+        # auto: prefer Gmail app password when set, else Brevo
+        if smtp_ready:
+            return "smtp"
+        if brevo_ready:
+            return "brevo"
+        return "dry_run"
+
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def reload_settings() -> Settings:
+    """Clear cache and reload .env (after editing secrets without full process restart)."""
+    get_settings.cache_clear()
+    global settings
+    settings = get_settings()
+    return settings
 
 
 settings = get_settings()
