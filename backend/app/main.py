@@ -8,12 +8,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
 from app.routers import alerts, apply, auth, cv, jobs, searches, tracker
+from app.services.scrape_scheduler import scrape_scheduler
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
-    yield
+    scrape_scheduler.start()
+    try:
+        yield
+    finally:
+        scrape_scheduler.stop()
 
 
 app = FastAPI(

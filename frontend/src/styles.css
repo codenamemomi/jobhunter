@@ -857,6 +857,10 @@ h1 {
   align-items: center;
 }
 
+.scrape-status-card {
+  margin-bottom: 1.25rem;
+}
+
 /* ---------- Tablet ---------- */
 @media (max-width: 960px) {
   .nav-desktop {

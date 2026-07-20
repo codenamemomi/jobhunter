@@ -64,6 +64,21 @@ class Settings(BaseSettings):
     # Uploaded CVs
     upload_dir: str = "./uploads"
 
+    # Auto-scrape (in-process scheduler + Celery schedule)
+    auto_scrape_enabled: bool = True
+    auto_scrape_interval_hours: float = 6.0
+    auto_scrape_on_startup: bool = False  # set true to scrape when API boots
+    auto_scrape_limit_per_source: int = 40
+    auto_scrape_query: str = ""  # optional keyword for all sources
+    # Comma-separated; empty = all free sources (+ Adzuna if keyed)
+    auto_scrape_sources: str = ""
+
+    @property
+    def auto_scrape_sources_list(self) -> list[str]:
+        if not self.auto_scrape_sources.strip():
+            return []
+        return [s.strip() for s in self.auto_scrape_sources.split(",") if s.strip()]
+
     @field_validator("brevo_api_key", "smtp_password", "smtp_user", "email_from", mode="before")
     @classmethod
     def _strip_secrets(cls, value: object) -> object:

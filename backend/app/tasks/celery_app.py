@@ -23,9 +23,11 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     beat_schedule={
+        # Keep in sync with AUTO_SCRAPE_INTERVAL_HOURS when using Celery in production
         "scrape-jobs-every-6h": {
             "task": "app.tasks.scrape_task.scrape_all_jobs",
             "schedule": crontab(minute=0, hour="*/6"),
+            "kwargs": {"limit_per_source": 40},
         },
         "send-alerts-hourly": {
             "task": "app.tasks.alert_task.process_alerts",

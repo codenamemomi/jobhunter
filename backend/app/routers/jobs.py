@@ -7,8 +7,10 @@ from app.database import get_db
 from app.models.job import Job
 from app.models.user import User
 from app.schemas.job import JobOut, ScrapeRequest, ScrapeResult
+from app.scrapers import source_catalog
 from app.services.auth_service import get_current_user
 from app.services.job_aggregator import JobAggregator, available_sources
+from app.services.scrape_scheduler import scrape_scheduler
 from app.utils.filters import apply_job_filters
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -49,6 +51,26 @@ def list_jobs(
 @router.get("/sources", response_model=list[str])
 def list_sources() -> list[str]:
     return available_sources()
+
+
+@router.get("/sources/catalog")
+def list_sources_catalog() -> list[dict]:
+    """Sources with metadata (key required or free)."""
+    return source_catalog()
+
+
+@router.get("/scrape/status")
+def scrape_status() -> dict:
+    """Auto-scrape scheduler status (in-app thread)."""
+    return scrape_scheduler.status()
+
+
+@router.post("/scrape/run-scheduled")
+def run_scheduled_scrape_now(
+    _: User = Depends(get_current_user),
+) -> dict:
+    """Trigger the same job the auto-scraper uses (auth required)."""
+    return scrape_scheduler.run_once()
 
 
 @router.post("/backfill-apply")

@@ -81,6 +81,10 @@ export const api = {
   listSources: () => request("/api/jobs/sources"),
   scrapeJobs: (payload) =>
     request("/api/jobs/scrape", { method: "POST", body: payload, auth: true }),
+  scrapeStatus: () => request("/api/jobs/scrape/status"),
+  runScheduledScrape: () =>
+    request("/api/jobs/scrape/run-scheduled", { method: "POST", auth: true }),
+  sourcesCatalog: () => request("/api/jobs/sources/catalog"),
   backfillApply: (limit = 500) =>
     request(`/api/jobs/backfill-apply?limit=${limit}`, { method: "POST", auth: true }),
 

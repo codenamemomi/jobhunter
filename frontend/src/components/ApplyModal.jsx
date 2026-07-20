@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 
 export default function ApplyModal({ job, matchScore, onClose, onSent }) {
@@ -9,9 +9,16 @@ export default function ApplyModal({ job, matchScore, onClose, onSent }) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [attachCv, setAttachCv] = useState(true);
+  // Avoid double create in React Strict Mode / rapid remounts
+  const startedForJob = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
+    if (startedForJob.current === job.id && draft) {
+      return undefined;
+    }
+    startedForJob.current = job.id;
+
     (async () => {
       setLoading(true);
       setError("");
@@ -33,7 +40,9 @@ export default function ApplyModal({ job, matchScore, onClose, onSent }) {
     return () => {
       cancelled = true;
     };
-  }, [job.id, matchScore]);
+    // only re-run when job changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job.id]);
 
   async function saveAndSend() {
     if (!draft) return;

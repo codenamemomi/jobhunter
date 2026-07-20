@@ -119,6 +119,12 @@ def create_draft(
     match_score: float | None = None,
     is_auto: bool = False,
 ) -> Application:
+    """
+    Create or refresh an email draft for this user+job.
+    Safe if called twice (double-click / React Strict Mode): upserts on unique key.
+    """
+    from sqlalchemy.exc import IntegrityError
+
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -131,29 +137,56 @@ def create_draft(
     cv = get_or_create_cv(db, user)
     to, default_subject, default_body = build_application_email(user, job, cv)
 
+    def _apply_fields(app: Application, *, is_new: bool) -> None:
+        if app.status == "applied" and app.sent_at:
+            raise HTTPException(status_code=400, detail="Already applied to this job")
+        app.status = "draft"
+        app.apply_channel = "email"
+        app.email_to = to
+        # Explicit overrides win; otherwise keep existing edits, or fill defaults
+        if subject is not None:
+            app.email_subject = subject
+        elif is_new or not app.email_subject:
+            app.email_subject = default_subject
+        if body is not None:
+            app.email_body = body
+        elif is_new or not app.email_body:
+            app.email_body = default_body
+        if match_score is not None:
+            app.match_score = match_score
+        if is_auto:
+            app.is_auto = True
+        app.send_error = None
+        app.updated_at = datetime.utcnow()
+
     app = (
         db.query(Application)
         .filter(Application.user_id == user.id, Application.job_id == job_id)
         .first()
     )
-    if app and app.status == "applied" and app.sent_at:
-        raise HTTPException(status_code=400, detail="Already applied to this job")
-
-    if not app:
+    is_new = app is None
+    if is_new:
         app = Application(user_id=user.id, job_id=job_id)
+        db.add(app)
 
-    app.status = "draft"
-    app.apply_channel = "email"
-    app.email_to = to
-    app.email_subject = subject or default_subject
-    app.email_body = body or default_body
-    app.match_score = match_score
-    app.is_auto = is_auto
-    app.send_error = None
-    app.updated_at = datetime.utcnow()
+    _apply_fields(app, is_new=is_new)
 
-    db.add(app)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Concurrent create for same user+job — update the row that won the race
+        db.rollback()
+        app = (
+            db.query(Application)
+            .filter(Application.user_id == user.id, Application.job_id == job_id)
+            .first()
+        )
+        if not app:
+            raise HTTPException(status_code=500, detail="Could not create draft") from None
+        _apply_fields(app, is_new=False)
+        db.add(app)
+        db.commit()
+
     return (
         db.query(Application)
         .options(joinedload(Application.job))

@@ -27,6 +27,8 @@ export default function Search() {
   const [error, setError] = useState("");
   const [scrapeMsg, setScrapeMsg] = useState("");
   const [scraping, setScraping] = useState(false);
+  const [scrapeStatus, setScrapeStatus] = useState(null);
+  const [catalog, setCatalog] = useState([]);
 
   const loadJobs = useCallback(async (f = filters) => {
     setLoading(true);
@@ -51,8 +53,14 @@ export default function Search() {
     }
   }, [filters]);
 
+  function refreshScrapeStatus() {
+    api.scrapeStatus().then(setScrapeStatus).catch(() => setScrapeStatus(null));
+  }
+
   useEffect(() => {
     api.listSources().then(setSources).catch(() => setSources([]));
+    api.sourcesCatalog().then(setCatalog).catch(() => setCatalog([]));
+    refreshScrapeStatus();
     const initial = {
       ...emptyFilters,
       apply_method: searchParams.get("apply_method") || "",
@@ -97,8 +105,36 @@ export default function Search() {
         }
       }
       await loadJobs(filters);
+      refreshScrapeStatus();
     } catch (err) {
       setScrapeMsg(err.message || "Scrape failed");
+    } finally {
+      setScraping(false);
+    }
+  }
+
+  async function runAutoScrapeNow() {
+    if (!isAuthenticated) {
+      setScrapeMsg("Sign in to run scheduled scrape.");
+      return;
+    }
+    setScraping(true);
+    setScrapeMsg("");
+    try {
+      const result = await api.runScheduledScrape();
+      if (result.status === "error") {
+        setScrapeMsg(result.detail || "Scheduled scrape failed");
+      } else if (result.status === "busy") {
+        setScrapeMsg(result.message || "Scrape already running");
+      } else {
+        setScrapeMsg(
+          `Auto-scrape done · fetched ${result.total_fetched ?? 0} · new ${result.total_new ?? 0}`
+        );
+      }
+      await loadJobs(filters);
+      refreshScrapeStatus();
+    } catch (err) {
+      setScrapeMsg(err.message || "Auto-scrape failed");
     } finally {
       setScraping(false);
     }
@@ -110,20 +146,73 @@ export default function Search() {
         <div>
           <h1>Search jobs</h1>
           <p className="muted">
-            Filter by <strong>Email apply</strong> to find roles you can apply to with your CV by mail.
+            Pull listings from multiple boards. Filter by <strong>Email apply</strong> when you want
+            mail-in applications.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={scrape}
-          disabled={scraping}
-        >
-          {scraping ? "Scraping…" : "Scrape now"}
-        </button>
+        <div className="btn-row toolbar-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={scrape}
+            disabled={scraping}
+          >
+            {scraping ? "Scraping…" : "Scrape now"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={runAutoScrapeNow}
+            disabled={scraping}
+          >
+            Run scheduled scrape
+          </button>
+        </div>
       </div>
 
       {scrapeMsg && <div className="alert alert-info">{scrapeMsg}</div>}
+
+      {scrapeStatus && (
+        <div className="card scrape-status-card">
+          <h2 className="card-title">Auto-scrape</h2>
+          <p className="muted small">
+            Status:{" "}
+            <strong>{scrapeStatus.enabled ? "enabled" : "disabled"}</strong>
+            {" · "}every {scrapeStatus.interval_hours}h
+            {" · "}
+            {scrapeStatus.thread_alive ? "scheduler running" : "scheduler stopped"}
+            {scrapeStatus.is_scraping_now ? " · scraping now…" : ""}
+          </p>
+          <p className="muted small">
+            Last run:{" "}
+            {scrapeStatus.last_run_at
+              ? new Date(scrapeStatus.last_run_at).toLocaleString()
+              : "never"}
+            {scrapeStatus.next_run_at
+              ? ` · next ~ ${new Date(scrapeStatus.next_run_at).toLocaleString()}`
+              : ""}
+          </p>
+          {scrapeStatus.last_error && (
+            <p className="alert alert-error" style={{ marginTop: "0.5rem" }}>
+              {scrapeStatus.last_error}
+            </p>
+          )}
+          {catalog.length > 0 && (
+            <p className="match-signals" style={{ marginTop: "0.6rem" }}>
+              <strong>Sources:</strong>{" "}
+              {catalog.map((s) => (
+                <span key={s.name} className="chip" title={s.requires_key ? "May need API key" : "Free"}>
+                  {s.name}
+                  {s.requires_key ? " *" : ""}
+                </span>
+              ))}
+            </p>
+          )}
+          <p className="muted small">
+            Configure via <code>AUTO_SCRAPE_*</code> in backend <code>.env</code>, then restart the API.
+          </p>
+        </div>
+      )}
 
       <form className="filters card" onSubmit={onSubmit}>
         <label className="field">
