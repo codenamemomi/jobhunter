@@ -21,7 +21,9 @@ class Settings(BaseSettings):
     debug: bool = True
     api_prefix: str = "/api"
 
-    # Database — SQLite by default so local dev works without Postgres
+    # Database — SQLite locally; set to Supabase Postgres for live testing:
+    # postgresql://postgres.[ref]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?sslmode=require
+    # or direct: postgresql://postgres:[PASSWORD]@db.[project].supabase.co:5432/postgres?sslmode=require
     database_url: str = "sqlite:///./jobhunter.db"
 
     # Auth / JWT
@@ -91,8 +93,21 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @property
+    def sqlalchemy_database_url(self) -> str:
+        """Normalize URI for SQLAlchemy (postgres:// → postgresql://)."""
+        url = (self.database_url or "").strip()
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://") :]
+        return url
+
+    @property
     def is_sqlite(self) -> bool:
-        return self.database_url.startswith("sqlite")
+        return self.sqlalchemy_database_url.startswith("sqlite")
+
+    @property
+    def is_postgres(self) -> bool:
+        u = self.sqlalchemy_database_url
+        return u.startswith("postgresql://") or u.startswith("postgresql+")
 
     @property
     def resolved_email_provider(self) -> Literal["smtp", "brevo", "dry_run"]:

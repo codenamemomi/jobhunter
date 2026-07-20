@@ -1,4 +1,4 @@
-"""SQLAlchemy engine and session configuration."""
+"""SQLAlchemy engine and session configuration (SQLite local / Postgres Supabase)."""
 
 from collections.abc import Generator
 
@@ -7,14 +7,23 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
 
-connect_args = {}
+_url = settings.sqlalchemy_database_url
+connect_args: dict = {}
+
 if settings.is_sqlite:
     connect_args = {"check_same_thread": False}
+elif settings.is_postgres:
+    # Supabase / managed Postgres typically need TLS
+    if "sslmode=" not in _url:
+        connect_args["sslmode"] = "require"
 
 engine = create_engine(
-    settings.database_url,
+    _url,
     connect_args=connect_args,
     pool_pre_ping=True,
+    # Supabase transaction pooler (port 6543) prefers smaller pools
+    pool_size=5 if settings.is_postgres else 5,
+    max_overflow=10 if settings.is_postgres else 10,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -32,7 +41,7 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-# table_name -> {column: sql_type}
+# Lightweight column adds for existing *SQLite* DBs only (create_all won't alter)
 _EXTRA_COLUMNS: dict[str, dict[str, str]] = {
     "cvs": {
         "original_filename": "VARCHAR(512)",
@@ -85,6 +94,14 @@ def _migrate_sqlite_columns() -> None:
 
 
 def init_db() -> None:
+    """
+    Bootstrap schema.
+
+    - SQLite: create_all + light column patches (local convenience)
+    - Postgres/Supabase: prefer Alembic (`alembic upgrade head`).
+      create_all still runs so first boot works if migrations not run yet;
+      Alembic remains source of truth for production changes.
+    """
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
